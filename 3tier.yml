@@ -1,0 +1,96 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Three-Tier Architecture'
+
+# Define parameters
+Parameters:
+  KeyName:
+    Description: 'Name of an existing EC2 key pair to enable SSH access to instances'
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: 'Must be an existing EC2 key pair'
+  InstanceType:
+    Description: 'Amazon EC2 instance type'
+    Type: 'String'
+    Default: 't2.micro'
+    AllowedValues:
+      - 't2.micro'
+      - 't2.small'
+      - 't2.medium'
+    ConstraintDescription: 'Must be a valid EC2 instance type'
+
+# Define resources
+Resources:
+
+  # Create a VPC
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: 'Name'
+          Value: 'Three-Tier VPC'
+
+  # Create an internet gateway
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+
+  # Attach the internet gateway to the VPC
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Create a public subnet
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: '10.0.0.0/24'
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: 'Name'
+          Value: 'Three-Tier Public Subnet'
+
+  # Create a private subnet for web application
+  WebPrivateSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: '10.0.1.0/24'
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: 'Name'
+          Value: 'Three-Tier Web Private Subnet'
+
+  # Create a private subnet for backend application
+  BackendPrivateSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: '10.0.2.0/24'
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: 'Name'
+          Value: 'Three-Tier Backend Private Subnet'
+
+  # Create a route table for public subnet
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'Three-Tier Public Route Table'
+
+  # Add a route to the internet gateway for public subnet
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  # Associate the public subnet with the public route table
